@@ -12,9 +12,9 @@ import HealthKit
 
 public class DailyQuantityScheduleTableViewController: SingleValueScheduleTableViewController {
 
-    public var unit: HKUnit = HKUnit.gramUnit() {
+    public var unit: HKUnit = HKUnit.gram() {
         didSet {
-            unitDisplayString = "\(unit)/U"
+            unitDisplayString = "\(unit.glucoseUnitDisplayString)/U"
         }
     }
 

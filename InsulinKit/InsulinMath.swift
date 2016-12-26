@@ -25,7 +25,7 @@ struct InsulinMath {
 
      - returns: The percentage of total insulin effect remaining
      */
-    private static func walshPercentEffectRemainingAtTime(time: NSTimeInterval, actionDuration: NSTimeInterval) -> Double {
+    private static func walshPercentEffectRemainingAtTime(_ time: TimeInterval, actionDuration: TimeInterval) -> Double {
 
         switch time {
         case let t where t <= 0:
@@ -34,27 +34,27 @@ struct InsulinMath {
             return 0
         default:
             // We only have Walsh models for a few discrete action durations, so we scale other action durations appropriately to the nearest one.
-            let nearestModeledDuration: NSTimeInterval
+            let nearestModeledDuration: TimeInterval
 
             switch actionDuration {
-            case let x where x < NSTimeInterval(hours: 3):
-                nearestModeledDuration = NSTimeInterval(hours: 3)
-            case let x where x > NSTimeInterval(hours: 6):
-                nearestModeledDuration = NSTimeInterval(hours: 6)
+            case let x where x < TimeInterval(hours: 3):
+                nearestModeledDuration = TimeInterval(hours: 3)
+            case let x where x > TimeInterval(hours: 6):
+                nearestModeledDuration = TimeInterval(hours: 6)
             default:
-                nearestModeledDuration = NSTimeInterval(hours: round(actionDuration.hours))
+                nearestModeledDuration = TimeInterval(hours: round(actionDuration.hours))
             }
 
             let minutes = time.minutes * nearestModeledDuration / actionDuration
 
             switch nearestModeledDuration {
-            case NSTimeInterval(hours: 3):
+            case TimeInterval(hours: 3):
                 return -3.2030e-9 * pow(minutes, 4) + 1.354e-6 * pow(minutes, 3) - 1.759e-4 * pow(minutes, 2) + 9.255e-4 * minutes + 0.99951
-            case NSTimeInterval(hours: 4):
+            case TimeInterval(hours: 4):
                 return -3.310e-10 * pow(minutes, 4) + 2.530e-7 * pow(minutes, 3) - 5.510e-5 * pow(minutes, 2) - 9.086e-4 * minutes + 0.99950
-            case NSTimeInterval(hours: 5):
+            case TimeInterval(hours: 5):
                 return -2.950e-10 * pow(minutes, 4) + 2.320e-7 * pow(minutes, 3) - 5.550e-5 * pow(minutes, 2) + 4.490e-4 * minutes + 0.99300
-            case NSTimeInterval(hours: 6):
+            case TimeInterval(hours: 6):
                 return -1.493e-10 * pow(minutes, 4) + 1.413e-7 * pow(minutes, 3) - 4.095e-5 * pow(minutes, 2) + 6.365e-4 * minutes + 0.99700
             default:
                 assertionFailure()
@@ -63,12 +63,12 @@ struct InsulinMath {
         }
     }
 
-    private static func insulinOnBoardForContinuousDose(dose: DoseEntry, atDate date: NSDate, actionDuration: NSTimeInterval, delay: NSTimeInterval, delta: NSTimeInterval) -> Double {
+    private static func insulinOnBoardForContinuousDose(_ dose: DoseEntry, atDate date: Date, actionDuration: TimeInterval, delay: TimeInterval, delta: TimeInterval) -> Double {
 
-        let doseDuration = dose.endDate.timeIntervalSinceDate(dose.startDate)  // t1
-        let time = date.timeIntervalSinceDate(dose.startDate)
+        let doseDuration = dose.endDate.timeIntervalSince(dose.startDate as Date)  // t1
+        let time = date.timeIntervalSince(dose.startDate as Date)
         var iob: Double = 0
-        var doseDate = NSTimeInterval(0)  // i
+        var doseDate = TimeInterval(0)  // i
 
         repeat {
             let segment = max(0, min(doseDate + delta, doseDuration) - doseDate) / doseDuration
@@ -79,17 +79,17 @@ struct InsulinMath {
         return iob
     }
 
-    private static func insulinOnBoardForDose(dose: DoseEntry, atDate date: NSDate, actionDuration: NSTimeInterval, delay: NSTimeInterval, delta: NSTimeInterval) -> Double {
-        let time = date.timeIntervalSinceDate(dose.startDate)
+    private static func insulinOnBoardForDose(_ dose: DoseEntry, atDate date: Date, actionDuration: TimeInterval, delay: TimeInterval, delta: TimeInterval) -> Double {
+        let time = date.timeIntervalSince(dose.startDate as Date)
         let iob: Double
 
         if time >= 0 {
-            if dose.unit == .Units {
+            if dose.unit == .units {
                 iob = dose.value * walshPercentEffectRemainingAtTime(time - delay, actionDuration: actionDuration)
-            } else if dose.unit == .UnitsPerHour && dose.endDate.timeIntervalSinceDate(dose.startDate) <= 1.05 * delta {
-                iob = dose.value * dose.endDate.timeIntervalSinceDate(dose.startDate) / NSTimeInterval(hours: 1) * walshPercentEffectRemainingAtTime(time - delay, actionDuration: actionDuration)
+            } else if dose.unit == .unitsPerHour && dose.endDate.timeIntervalSince(dose.startDate as Date) <= 1.05 * delta {
+                iob = dose.value * dose.endDate.timeIntervalSince(dose.startDate as Date) / TimeInterval(hours: 1) * walshPercentEffectRemainingAtTime(time - delay, actionDuration: actionDuration)
             } else {
-                iob = dose.value * dose.endDate.timeIntervalSinceDate(dose.startDate) / NSTimeInterval(hours: 1) * insulinOnBoardForContinuousDose(dose, atDate: date, actionDuration: actionDuration, delay: delay, delta: delta)
+                iob = dose.value * dose.endDate.timeIntervalSince(dose.startDate as Date) / TimeInterval(hours: 1) * insulinOnBoardForContinuousDose(dose, atDate: date, actionDuration: actionDuration, delay: delay, delta: delta)
             }
         } else {
             iob = 0
@@ -98,11 +98,11 @@ struct InsulinMath {
         return iob
     }
 
-    private static func glucoseEffectForContinuousDose(dose: DoseEntry, atDate date: NSDate, actionDuration: NSTimeInterval, delay: NSTimeInterval, delta: NSTimeInterval) -> Double {
-        let doseDuration = dose.endDate.timeIntervalSinceDate(dose.startDate)  // t1
-        let time = date.timeIntervalSinceDate(dose.startDate)
+    private static func glucoseEffectForContinuousDose(_ dose: DoseEntry, atDate date: Date, actionDuration: TimeInterval, delay: TimeInterval, delta: TimeInterval) -> Double {
+        let doseDuration = dose.endDate.timeIntervalSince(dose.startDate as Date)  // t1
+        let time = date.timeIntervalSince(dose.startDate as Date)
         var value: Double = 0
-        var doseDate = NSTimeInterval(0)  // i
+        var doseDate = TimeInterval(0)  // i
 
         repeat {
             let segment = max(0, min(doseDate + delta, doseDuration) - doseDate) / doseDuration
@@ -113,17 +113,17 @@ struct InsulinMath {
         return value
     }
 
-    private static func glucoseEffectForDose(dose: DoseEntry, atDate date: NSDate, actionDuration: NSTimeInterval, insulinSensitivity: Double, delay: NSTimeInterval, delta: NSTimeInterval) -> Double {
-        let time = date.timeIntervalSinceDate(dose.startDate)
+    private static func glucoseEffectForDose(_ dose: DoseEntry, atDate date: Date, actionDuration: TimeInterval, insulinSensitivity: Double, delay: TimeInterval, delta: TimeInterval) -> Double {
+        let time = date.timeIntervalSince(dose.startDate as Date)
         let value: Double
 
         if time >= 0 {
-            if dose.unit == .Units {
+            if dose.unit == .units {
                 value = dose.value * -insulinSensitivity * (1.0 - walshPercentEffectRemainingAtTime(time - delay, actionDuration: actionDuration))
-            } else if dose.unit == .UnitsPerHour && dose.endDate.timeIntervalSinceDate(dose.startDate) <= 1.05 * delta {
-                value = dose.value * -insulinSensitivity * dose.endDate.timeIntervalSinceDate(dose.startDate) / NSTimeInterval(hours: 1) * (1.0 - walshPercentEffectRemainingAtTime(time - delay, actionDuration: actionDuration))
+            } else if dose.unit == .unitsPerHour && dose.endDate.timeIntervalSince(dose.startDate as Date) <= 1.05 * delta {
+                value = dose.value * -insulinSensitivity * dose.endDate.timeIntervalSince(dose.startDate as Date) / TimeInterval(hours: 1) * (1.0 - walshPercentEffectRemainingAtTime(time - delay, actionDuration: actionDuration))
             } else {
-                value = dose.value * -insulinSensitivity * dose.endDate.timeIntervalSinceDate(dose.startDate) / NSTimeInterval(hours: 1) * glucoseEffectForContinuousDose(dose, atDate: date, actionDuration: actionDuration, delay: delay, delta: delta)
+                value = dose.value * -insulinSensitivity * dose.endDate.timeIntervalSince(dose.startDate as Date) / TimeInterval(hours: 1) * glucoseEffectForContinuousDose(dose, atDate: date, actionDuration: actionDuration, delay: delay, delta: delta)
             }
         } else {
             value = 0
@@ -133,12 +133,15 @@ struct InsulinMath {
     }
 
     /**
-     It takes a MM pump about 40s to deliver 1 Unit while bolusing
+     It takes a MM x22 pump about 40s to deliver 1 Unit while bolusing
      See: http://www.healthline.com/diabetesmine/ask-dmine-speed-insulin-pumps#3
+     
+     The x23 and newer pumps can deliver at 2x, 3x, and 4x that speed, targeting
+     a maximum 5-minute delivery for all boluses (8U - 25U)
      
      A basal rate of 30 U/hour (near-max) would deliver an additional 0.5 U/min.
      */
-    private static let MaximumReservoirDropPerMinute = 2.0
+    private static let MaximumReservoirDropPerMinute = 6.5
 
     /**
      Converts a continuous sequence of reservoir values to a sequence of doses
@@ -147,28 +150,29 @@ struct InsulinMath {
 
      - returns: An array of doses
      */
-    static func doseEntriesFromReservoirValues<T: CollectionType where T.Generator.Element: ReservoirValue>(values: T) -> [DoseEntry] {
+    static func doseEntriesFromReservoirValues<T: Collection>(_ values: T) -> [DoseEntry] where T.Iterator.Element: ReservoirValue {
 
         var doses: [DoseEntry] = []
-        var previousValue: T.Generator.Element?
+        var previousValue: T.Iterator.Element?
 
-        let numberFormatter = NSNumberFormatter()
-        numberFormatter.numberStyle = .DecimalStyle
+        let numberFormatter = NumberFormatter()
+        numberFormatter.numberStyle = .decimal
         numberFormatter.maximumFractionDigits = 3
 
         for value in values {
             if let previousValue = previousValue {
                 let volumeDrop = previousValue.unitVolume - value.unitVolume
-                let duration = value.startDate.timeIntervalSinceDate(previousValue.startDate)
+                let duration = value.startDate.timeIntervalSince(previousValue.startDate as Date)
 
                 if duration > 0 && 0 <= volumeDrop && volumeDrop <= MaximumReservoirDropPerMinute * duration.minutes {
                     doses.append(DoseEntry(
-                        type: .TempBasal,
+                        type: .tempBasal,
                         startDate: previousValue.startDate,
                         endDate: value.startDate,
-                        value: volumeDrop * NSTimeInterval(hours: 1) / duration,
-                        unit: .UnitsPerHour,
-                        description: "Reservoir decreased \(numberFormatter.stringFromNumber(volumeDrop) ?? String(volumeDrop))U over \(numberFormatter.stringFromNumber(duration.minutes) ?? String(duration.minutes))min"
+                        value: volumeDrop * TimeInterval(hours: 1) / duration,
+                        unit: .unitsPerHour,
+                        // TODO: Get rid of this property or properly localize it
+                        description: "Reservoir decreased \(numberFormatter.string(from: NSNumber(value: volumeDrop)) ?? String(volumeDrop))U over \(numberFormatter.string(from: NSNumber(value: duration.minutes)) ?? String(duration.minutes))min"
                     ))
                 }
             }
@@ -180,46 +184,107 @@ struct InsulinMath {
     }
 
     /**
+     Whether a span of reservoir values is considered continuous and therefore reliable.
+     
+     Reservoir values of 0 are automatically considered unreliable due to the assumption that an unknown amount of insulin can be delivered after the 0 marker.
+
+     - parameter entries:         A collection of reservoir values, in chronological order
+     - parameter startDate:       The beginning of the interval in which to validate continuity
+     - parameter endDate:         The end of the interval in which to validate continuity
+     - parameter maximumDuration: The maximum interval to consider reliable for a reservoir-derived dose
+     
+     - returns: Whether the reservoir values meet the critera for continuity
+     */
+    static func isContinuous<T: Collection>(_ values: T, from startDate: Date, to endDate: Date = Date(), within maximumDuration: TimeInterval = TimeInterval(minutes: 30)) -> Bool where T.Iterator.Element: ReservoirValue {
+
+        // The first value has to be at least as old as the start date, as a reference point.
+        guard let firstValue = values.first, firstValue.endDate <= startDate else {
+            return false
+        }
+        var lastValue = firstValue
+
+        for value in values {
+            defer {
+                lastValue = value
+            }
+
+            // Volume and interval validation only applies for values in the specified range,
+            guard value.endDate >= startDate && value.startDate <= endDate else {
+                continue
+            }
+
+            // We can't trust 0. What else was delivered?
+            guard value.unitVolume > 0 else {
+                return false
+            }
+
+            // Rises in reservoir volume indicate a rewind + prime, and primes
+            // can be easily confused with boluses.
+            // Small rises (1 U) can be ignored as they're indicative of a mixed-precision sequence.
+            guard value.unitVolume <= lastValue.unitVolume + 1 else {
+                return false
+            }
+
+            // Ensure no more than the maximum interval has passed
+            guard value.startDate.timeIntervalSince(lastValue.endDate) <= maximumDuration else {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    /**
      Maps a timeline of dose entries with overlapping start and end dates to a timeline of doses that represents actual insulin delivery.
 
      - parameter doses:     A timeline of dose entries, in chronological order
 
      - returns: An array of reconciled insulin delivery history, as TempBasal and Bolus records
      */
-    static func reconcileDoses<T: CollectionType where T.Generator.Element == DoseEntry>(doses: T) -> [DoseEntry] {
+    static func reconcileDoses<T: Collection>(_ doses: T) -> [DoseEntry] where T.Iterator.Element == DoseEntry {
 
         var reconciled: [DoseEntry] = []
 
+        var lastSuspend: DoseEntry?
         var lastTempBasal: DoseEntry?
 
         for dose in doses {
             switch dose.type {
-            case .Bolus:
+            case .bolus:
                 reconciled.append(dose)
-            case .TempBasal:
+            case .tempBasal:
                 if let temp = lastTempBasal {
-                    reconciled.append(DoseEntry(
-                        type: temp.type,
-                        startDate: temp.startDate,
-                        endDate: min(temp.endDate, dose.startDate),
-                        value: temp.value,
-                        unit: temp.unit,
-                        description: temp.description
-                    ))
+                    let endDate = min(temp.endDate, dose.startDate)
+
+                    // Ignore 0-duration doses
+                    if endDate > temp.startDate {
+                        reconciled.append(DoseEntry(
+                            type: temp.type,
+                            startDate: temp.startDate,
+                            endDate: endDate,
+                            value: temp.value,
+                            unit: temp.unit,
+                            description: temp.description
+                        ))
+                    }
                 }
 
                 lastTempBasal = dose
-            case .Suspend:
-                if let temp = lastTempBasal {
+            case .resume:
+                if let suspend = lastSuspend {
                     reconciled.append(DoseEntry(
-                        type: temp.type,
-                        startDate: temp.startDate,
-                        endDate: min(temp.endDate, dose.startDate),
-                        value: temp.value,
-                        unit: temp.unit,
-                        description: temp.description
+                        type: suspend.type,
+                        startDate: suspend.startDate,
+                        endDate: dose.endDate,
+                        value: suspend.value,
+                        unit: suspend.unit,
+                        description: suspend.description ?? dose.description
                     ))
 
+                    lastSuspend = nil
+                }
+
+                if let temp = lastTempBasal {
                     if temp.endDate > dose.endDate {
                         lastTempBasal = DoseEntry(
                             type: temp.type,
@@ -233,27 +298,44 @@ struct InsulinMath {
                         lastTempBasal = nil
                     }
                 }
+            case .suspend:
+                if let temp = lastTempBasal {
+                    reconciled.append(DoseEntry(
+                        type: temp.type,
+                        startDate: temp.startDate,
+                        endDate: min(temp.endDate, dose.startDate),
+                        value: temp.value,
+                        unit: temp.unit,
+                        description: temp.description
+                    ))
 
-                reconciled.append(dose)
+                    if temp.endDate <= dose.startDate {
+                        lastTempBasal = nil
+                    }
+                }
+
+                lastSuspend = dose
             }
         }
 
-        if let temp = lastTempBasal {
+        if let suspend = lastSuspend {
+            reconciled.append(suspend)
+        } else if let temp = lastTempBasal, temp.endDate > temp.startDate {
             reconciled.append(temp)
         }
 
         return reconciled
     }
 
-    private static func normalizeBasalDose(dose: DoseEntry, againstBasalSchedule basalSchedule: BasalRateSchedule) -> [DoseEntry] {
+    private static func normalizeBasalDose(_ dose: DoseEntry, againstBasalSchedule basalSchedule: BasalRateSchedule) -> [DoseEntry] {
 
         var normalizedDoses: [DoseEntry] = []
-        let basalItems = basalSchedule.between(dose.startDate, dose.endDate)
+        let basalItems = basalSchedule.between(start: dose.startDate, end: dose.endDate)
 
-        for (index, basalItem) in basalItems.enumerate() {
+        for (index, basalItem) in basalItems.enumerated() {
             let value = dose.value - basalItem.value
-            let startDate: NSDate
-            let endDate: NSDate
+            let startDate: Date
+            let endDate: Date
 
             if index == 0 {
                 startDate = dose.startDate
@@ -290,12 +372,12 @@ struct InsulinMath {
 
      - returns: An array of normalized dose entries
      */
-    static func normalize<T: CollectionType where T.Generator.Element == DoseEntry>(doses: T, againstBasalSchedule basalSchedule: BasalRateSchedule) -> [DoseEntry] {
+    static func normalize<T: Collection>(_ doses: T, againstBasalSchedule basalSchedule: BasalRateSchedule) -> [DoseEntry] where T.Iterator.Element == DoseEntry {
 
         var normalizedDoses: [DoseEntry] = []
 
         for dose in doses {
-            if dose.unit == .UnitsPerHour {
+            if dose.unit == .unitsPerHour {
                 normalizedDoses += normalizeBasalDose(dose, againstBasalSchedule: basalSchedule)
             } else {
                 normalizedDoses.append(dose)
@@ -312,15 +394,15 @@ struct InsulinMath {
 
      - returns: The total insulin insulin, in Units
      */
-    static func totalDeliveryForDoses<T: CollectionType where T.Generator.Element == DoseEntry>(doses: T) -> Double {
+    static func totalDeliveryForDoses<T: Collection>(_ doses: T) -> Double where T.Iterator.Element == DoseEntry {
         var total: Double = 0
 
         for dose in doses {
             switch dose.unit {
-            case .Units:
+            case .units:
                 total += dose.value
-            case .UnitsPerHour:
-                total += dose.value * dose.endDate.timeIntervalSinceDate(dose.startDate) / NSTimeInterval(hours: 1)
+            case .unitsPerHour:
+                total += dose.value * dose.endDate.timeIntervalSince(dose.startDate as Date) / TimeInterval(hours: 1)
             }
         }
 
@@ -339,14 +421,14 @@ struct InsulinMath {
 
      - returns: A sequence of insulin amount remaining
      */
-    static func insulinOnBoardForDoses<T: CollectionType where T.Generator.Element == DoseEntry>(
-        doses: T,
-        actionDuration: NSTimeInterval,
-        fromDate: NSDate? = nil,
-        toDate: NSDate? = nil,
-        delay: NSTimeInterval = NSTimeInterval(minutes: 10),
-        delta: NSTimeInterval = NSTimeInterval(minutes: 5)
-    ) -> [InsulinValue] {
+    static func insulinOnBoardForDoses<T: Collection>(
+        _ doses: T,
+        actionDuration: TimeInterval,
+        fromDate: Date? = nil,
+        toDate: Date? = nil,
+        delay: TimeInterval = TimeInterval(minutes: 10),
+        delta: TimeInterval = TimeInterval(minutes: 5)
+    ) -> [InsulinValue] where T.Iterator.Element == DoseEntry {
         guard let (startDate, endDate) = LoopMath.simulationDateRangeForSamples(doses, fromDate: fromDate, toDate: toDate, duration: actionDuration, delay: delay, delta: delta) else {
             return []
         }
@@ -360,7 +442,7 @@ struct InsulinMath {
             }
 
             values.append(InsulinValue(startDate: date, value: value))
-            date = date.dateByAddingTimeInterval(delta)
+            date = date.addingTimeInterval(delta)
         } while date <= endDate
 
         return values
@@ -378,15 +460,15 @@ struct InsulinMath {
 
      - returns: A sequence of glucose effects
      */
-    static func glucoseEffectsForDoses<T: CollectionType where T.Generator.Element == DoseEntry>(
-        doses: T,
-        actionDuration: NSTimeInterval,
+    static func glucoseEffectsForDoses<T: Collection>(
+        _ doses: T,
+        actionDuration: TimeInterval,
         insulinSensitivity: InsulinSensitivitySchedule,
-        fromDate: NSDate? = nil,
-        toDate: NSDate? = nil,
-        delay: NSTimeInterval = NSTimeInterval(minutes: 10),
-        delta: NSTimeInterval = NSTimeInterval(minutes: 5)
-    ) -> [GlucoseEffect] {
+        fromDate: Date? = nil,
+        toDate: Date? = nil,
+        delay: TimeInterval = TimeInterval(minutes: 10),
+        delta: TimeInterval = TimeInterval(minutes: 5)
+    ) -> [GlucoseEffect] where T.Iterator.Element == DoseEntry {
         guard let (startDate, endDate) = LoopMath.simulationDateRangeForSamples(doses, fromDate: fromDate, toDate: toDate, duration: actionDuration, delay: delay, delta: delta) else {
             return []
         }
@@ -397,11 +479,11 @@ struct InsulinMath {
 
         repeat {
             let value = doses.reduce(0) { (value, dose) -> Double in
-                return value + glucoseEffectForDose(dose, atDate: date, actionDuration: actionDuration, insulinSensitivity: insulinSensitivity.quantityAt(dose.startDate).doubleValueForUnit(unit), delay: delay, delta: delta)
+                return value + glucoseEffectForDose(dose, atDate: date, actionDuration: actionDuration, insulinSensitivity: insulinSensitivity.quantity(at: dose.startDate).doubleValue(for: unit), delay: delay, delta: delta)
             }
 
             values.append(GlucoseEffect(startDate: date, quantity: HKQuantity(unit: unit, doubleValue: value)))
-            date = date.dateByAddingTimeInterval(delta)
+            date = date.addingTimeInterval(delta)
         } while date <= endDate
 
         return values

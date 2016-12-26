@@ -8,37 +8,43 @@
 
 import HealthKit
 
-private let unit = HKUnit.gramUnit()
+private let unit = HKUnit.gram()
 
 
 struct StoredCarbEntry: CarbEntry {
 
-    let sampleUUID: NSUUID
+    let sampleUUID: UUID
 
     // MARK: - SampleValue
 
-    let startDate: NSDate
+    let startDate: Date
     let quantity: HKQuantity
 
     // MARK: - CarbEntry
 
     let foodType: String?
-    let absorptionTime: NSTimeInterval?
+    let absorptionTime: TimeInterval?
     let createdByCurrentApp: Bool
+    let externalId: String?
+    let isUploaded: Bool
 
     init(sample: HKQuantitySample, createdByCurrentApp: Bool? = nil) {
-        self.init(sampleUUID: sample.UUID, startDate: sample.startDate, unitString: unit.unitString, value: sample.quantity.doubleValueForUnit(unit), foodType: sample.foodType, absorptionTime: sample.absorptionTime, createdByCurrentApp: createdByCurrentApp ?? sample.createdByCurrentApp)
+        self.init(sampleUUID: sample.uuid, startDate: sample.startDate, unitString: unit.unitString, value: sample.quantity.doubleValue(for: unit), foodType: sample.foodType, absorptionTime: sample.absorptionTime, createdByCurrentApp: createdByCurrentApp ?? sample.createdByCurrentApp, externalId: sample.externalId)
 
     }
 
-    init(sampleUUID: NSUUID, startDate: NSDate, unitString: String, value: Double, foodType: String?, absorptionTime: NSTimeInterval?, createdByCurrentApp: Bool) {
+    init(sampleUUID: UUID, startDate: Date, unitString: String, value: Double, foodType: String?, absorptionTime: TimeInterval?, createdByCurrentApp: Bool, externalId: String?) {
         self.sampleUUID = sampleUUID
         self.startDate = startDate
-        self.quantity = HKQuantity(unit: HKUnit(fromString: unitString), doubleValue: value)
+        self.quantity = HKQuantity(unit: HKUnit(from: unitString), doubleValue: value)
         self.foodType = foodType
         self.absorptionTime = absorptionTime
         self.createdByCurrentApp = createdByCurrentApp
+        self.externalId = externalId
+        self.isUploaded = self.externalId != nil
     }
+
+
 }
 
 
@@ -50,24 +56,26 @@ extension StoredCarbEntry: Hashable {
 
 
 func ==(lhs: StoredCarbEntry, rhs: StoredCarbEntry) -> Bool {
-    return lhs.sampleUUID.isEqual(rhs.sampleUUID)
+    return (lhs.sampleUUID == rhs.sampleUUID)
 }
 
 
 extension StoredCarbEntry: RawRepresentable {
-    typealias RawValue = [String: AnyObject]
+    typealias RawValue = [String: Any]
 
     init?(rawValue: RawValue) {
         guard let
             sampleUUIDString = rawValue["sampleUUID"] as? String,
-            sampleUUID = NSUUID(UUIDString: sampleUUIDString),
-            startDate = rawValue["startDate"] as? NSDate,
-            unitString = rawValue["unitString"] as? String,
-            value = rawValue["value"] as? Double,
-            createdByCurrentApp = rawValue["createdByCurrentApp"] as? Bool else
+            let sampleUUID = UUID(uuidString: sampleUUIDString),
+            let startDate = rawValue["startDate"] as? Date,
+            let unitString = rawValue["unitString"] as? String,
+            let value = rawValue["value"] as? Double,
+            let createdByCurrentApp = rawValue["createdByCurrentApp"] as? Bool else
         {
             return nil
         }
+
+        let externalId = rawValue["externalId"]
 
         self.init(
             sampleUUID: sampleUUID,
@@ -75,19 +83,24 @@ extension StoredCarbEntry: RawRepresentable {
             unitString: unitString,
             value: value,
             foodType: rawValue["foodType"] as? String,
-            absorptionTime: rawValue["absorptionTime"] as? NSTimeInterval,
-            createdByCurrentApp: createdByCurrentApp
+            absorptionTime: rawValue["absorptionTime"] as? TimeInterval,
+            createdByCurrentApp: createdByCurrentApp,
+            externalId: externalId as? String
         )
     }
 
     var rawValue: RawValue {
         var raw: RawValue = [
-            "sampleUUID": sampleUUID.UUIDString,
+            "sampleUUID": sampleUUID.uuidString,
             "startDate": startDate,
             "unitString": unit.unitString,
-            "value": quantity.doubleValueForUnit(unit),
-            "createdByCurrentApp": createdByCurrentApp
+            "value": quantity.doubleValue(for: unit),
+            "createdByCurrentApp": createdByCurrentApp,
         ]
+
+        if let externalId = externalId {
+            raw["externalId"] = externalId
+        }
 
         if let foodType = foodType {
             raw["foodType"] = foodType
